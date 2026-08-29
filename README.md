@@ -1,151 +1,280 @@
-# Character-Level Phishing URL Detection Under Selective Percent-Encoding
+# Leakage-Safe Phishing URL Detection Under Standards-Aware Transformations
 
-This repository evaluates the robustness of three character-level neural
-classifiers—LSTM, bidirectional LSTM (BiLSTM), and Transformer—for phishing URL
-detection. The models are tested on both original URLs and URLs processed by a
-deterministic selective percent-encoding transformation.
+A domain-held-out, multi-seed study of clean phishing-URL detection and
+robustness to standards-aware URL representation changes.
 
-The central result is that aggregate test scores can hide concentrated
-weaknesses: only 12.29% of the test URLs changed under the implemented
-transformation, and performance on that changed subset was noticeably lower
-than performance on the full transformed test set.
+This repository accompanies the study **“Leakage-Safe Phishing URL Detection
+Under Standards-Aware Transformations: A Domain-Held-Out, Multi-Seed
+Robustness Study.”** It evaluates four character-level neural networks and two
+classical baselines using canonical deduplication, registrable-domain-held-out
+splits, training-only preprocessing, validation-only threshold selection, and
+paired robustness analysis.
 
-## Dataset
+> **Scope.** This is an offline defensive evaluation. The experiment does not
+> visit URLs, resolve domains, retrieve page content, submit credentials, or
+> interact with live services. The transformations test representation
+> sensitivity; they do not prove destination-equivalent end-to-end attacks.
 
-The experiments use the Kaggle
+## Main findings
+
+- Cleaning reduced 822,010 raw rows to 799,620 unique labeled URLs after
+  removing contradictory labels and canonical duplicates.
+- The split contains 471,429 training, 162,900 validation, and 165,291 test
+  URLs, with zero canonical-URL and zero registrable-domain overlap.
+- Eighteen runs were completed: six models × three seeds (42, 52, and 62).
+- CharCNN achieved the best clean domain-held-out phishing F1:
+  **0.9613 ± 0.0032**.
+- Selective path/query percent-encoding changed 114,034 test URLs
+  (**68.99% coverage**).
+- Character 3–5-gram TF-IDF logistic regression was the most stable model under
+  percent-encoding: mean full-test F1 decrease **0.0329**, changed-subset F1
+  decrease **0.0699**, and conditional ASR **9.08%**.
+- For all six models, primary-seed changed-subset F1 decreases had
+  registrable-domain-cluster confidence intervals excluding zero; Holm-adjusted
+  cluster sign-flip p-values were **0.0012**.
+
+The central result is that the best model on clean URLs is not necessarily the
+most robust model under representation changes.
+
+## Experimental design
+
+### Dataset
+
+The experiment uses the public
 [Phishing and Legitimate URLs](https://www.kaggle.com/datasets/harisudhan411/phishing-and-legitimate-urls)
-dataset. The loaded CSV contains 822,010 labeled URLs and two columns:
+dataset. The notebook expects `new_data_urls.csv` with `url` and `status`
+columns. In the source dataset, `0` denotes phishing and `1` denotes
+legitimate; the experiment remaps phishing to positive class `1` for all
+metrics.
 
-| Column | Description |
-|---|---|
-| `url` | URL string used as model input |
-| `status` | Binary label: `0` = phishing, `1` = legitimate |
+The raw dataset is not redistributed in this repository. Download or attach it
+directly from Kaggle. The executed run records the source-file SHA-256 digest
+in `CONFIG.json` and the artifact manifest.
 
-The dataset contains 394,982 phishing URLs (48.05%) and 427,028 legitimate
-URLs (51.95%). The executed notebook uses a seed-42 stratified split:
+### Leakage controls
 
-| Partition | URLs | Share |
-|---|---:|---:|
-| Training | 493,206 | 60% |
-| Validation | 164,402 | 20% |
-| Test | 164,402 | 20% |
+1. Unicode NFC normalization and removal of surrounding whitespace/control
+   characters.
+2. Canonical URL keys used only for duplicate auditing—not as model input.
+3. Complete removal of canonical URLs with contradictory labels.
+4. Deterministic same-label canonical deduplication.
+5. Five-fold `StratifiedGroupKFold` assignment by registrable domain: three
+   folds for training, one for validation, and one for testing.
+6. Executable assertions for zero URL and domain overlap between partitions.
+7. Character vocabulary and all learned preprocessing fitted on training data
+   only.
+8. Decision thresholds selected on clean validation predictions and frozen
+   before test evaluation.
 
-## Methodology
+### Models
 
-- Character-level input representation
-- Maximum URL length: 200 characters
-- Character vocabulary size: 329
-- Embedding dimension: 128
-- Models: LSTM, BiLSTM, and Transformer
-- Decision threshold: 0.5
-- Paired evaluation on original and transformed versions of the same test URLs
-- Phishing is explicitly treated as the positive class when calculating
-  precision, recall, F1, and PR-AUC
-- Robustness analysis includes paired bootstrap confidence intervals, McNemar's
-  test, attack success rate (ASR), changed-only evaluation, and truncation
-  diagnostics
+| Family | Model | Main representation |
+|---|---|---|
+| Neural | LSTM | Training-only character vocabulary |
+| Neural | BiLSTM | Training-only character vocabulary |
+| Neural | CharCNN | Parallel character convolutions (3, 5, 7) |
+| Neural | Transformer | Positional embeddings and masked self-attention |
+| Classical | CharNgramLogistic | Character 3–5-gram TF-IDF + SGD logistic regression |
+| Classical | LexicalHistGB | 21 lexical/structural features + histogram gradient boosting |
 
-The implemented transformation should be described as **selective
-percent-encoding**, not complete hexadecimal domain obfuscation. It changes
-20,204 of 164,402 test URLs and leaves common ASCII hostname characters
-unchanged.
+Neural models use a maximum URL length of 200, 96-dimensional embeddings,
+class-balanced training, Adam optimization, early stopping, and a maximum of
+15 epochs. Every model is evaluated with seeds 42, 52, and 62.
 
-## Main Results
+### Transformations
 
-| Model | Original phishing F1 | Transformed phishing F1 | F1 decrease | ASR | Changed-only F1 |
+| Condition | Test URLs changed | Coverage | Newly over 200 characters |
+|---|---:|---:|---:|
+| Selective path/query percent-encoding | 114,034 | 68.99% | 2,454 |
+| DNS host-case control | 163,848 | 99.13% | 0 |
+| Explicit default-port control | 37,647 | 22.78% | 7 |
+| IDNA host conversion | 4 | 0.0024% | 0 |
+
+Coverage is computed from actual string inequality. Unchanged URLs are not
+reported as transformed examples. The adaptive best-of-k condition is retained
+as supplementary analysis rather than treated as the primary threat model.
+
+## Results
+
+### Clean domain-held-out performance
+
+Values are means over three seeds.
+
+| Model | Phishing F1 (mean ± SD) | PR-AUC | Recall | MCC |
+|---|---:|---:|---:|---:|
+| CharCNN | **0.9613 ± 0.0032** | **0.9935** | 0.9608 | **0.9311** |
+| LSTM | 0.9605 ± 0.0012 | 0.9923 | 0.9489 | 0.9305 |
+| BiLSTM | 0.9579 ± 0.0029 | 0.9923 | 0.9555 | 0.9251 |
+| CharNgramLogistic | 0.9431 ± 0.00002 | 0.9858 | 0.9440 | 0.8986 |
+| Transformer | 0.9346 ± 0.0038 | 0.9838 | 0.9176 | 0.8856 |
+| LexicalHistGB | 0.9007 ± 0.0008 | 0.9711 | 0.8516 | 0.8348 |
+
+### Selective percent-encoding robustness
+
+Values are means over three seeds. “Changed drop” evaluates exactly the URLs
+whose string representation changed. Conditional ASR is restricted to clean-
+detected phishing URLs that were actually transformed.
+
+| Model | Clean F1 | Transformed F1 | Full F1 drop | Changed F1 drop | Conditional ASR |
 |---|---:|---:|---:|---:|---:|
-| LSTM | 0.9770 | 0.9743 | 0.0026 | 0.46% | 0.9476 |
-| BiLSTM | 0.9710 | 0.9673 | 0.0036 | 0.81% | 0.9277 |
-| Transformer | 0.9200 | 0.9116 | 0.0084 | 1.56% | 0.8196 |
+| CharNgramLogistic | 0.9431 | **0.9102** | **0.0329** | **0.0699** | **9.08%** |
+| BiLSTM | 0.9579 | 0.9025 | 0.0553 | 0.1246 | 22.50% |
+| CharCNN | 0.9613 | 0.8936 | 0.0677 | 0.1486 | 22.22% |
+| LSTM | 0.9605 | 0.8826 | 0.0779 | 0.1827 | 31.86% |
+| LexicalHistGB | 0.9007 | 0.8110 | 0.0897 | 0.2340 | 41.67% |
+| Transformer | 0.9346 | 0.8303 | 0.1043 | 0.2550 | 41.14% |
 
-LSTM achieved the highest phishing F1 and the smallest observed robustness
-decrease. Transformer showed the largest F1 decrease and evasion rate in this
-specific experiment. These results apply only to the executed dataset, model
-configurations, split, and transformation.
+Exact per-seed values, confidence intervals, raw discordance counts, subgroup
+results, calibration metrics, and adjusted p-values are provided in the CSV
+tables and full artifact bundle. The tables—not rounded README values—are the
+authoritative numerical record.
 
-## Visualizations
+## Statistical evaluation
 
-### Phishing performance
+The notebook exports:
 
-![Original and transformed phishing performance](FIG1_Phishing_Performance.png)
+- accuracy, balanced accuracy, precision, recall, specificity, F1, PR-AUC,
+  ROC-AUC, MCC, Brier score, 15-bin ECE, and confusion counts;
+- full-test and exactly changed-subset paired effects;
+- conditional and unconditional attack success rate with Wilson intervals;
+- 5,000-draw row-paired bootstrap intervals;
+- 1,000-draw registrable-domain-cluster bootstrap intervals;
+- McNemar discordant counts as supplementary row-level evidence;
+- 5,000-permutation registrable-domain-cluster sign-flip tests;
+- Holm correction across the six models within each transformation;
+- URL-length and domain-multiplicity subgroup diagnostics; and
+- supplementary paired clean-model comparisons.
 
-### Robustness effect and attack success rate
+Primary inferential analysis uses seed 42. Seeds 52 and 62 quantify training
+variability and are not treated as independent datasets.
 
-![Paired F1 decrease and attack success rate](FIG2_Robustness_ASR_CI.png)
-
-Additional figures:
-
-- `FIG3_Transformation_Diagnostics.png`: transformation coverage and URL-length diagnostics
-- `FIG4_Phishing_PR_Curves.png`: phishing-class precision–recall curves
-
-## Repository Contents
-
-| File | Purpose |
-|---|---|
-| `notebook24fa603559 (2).ipynb` | End-to-end training, evaluation, and visualization notebook |
-| `lstm_best.weights.h5` | Best saved LSTM weights |
-| `bilstm_best.weights.h5` | Best saved BiLSTM weights |
-| `transformer_best.weights.h5` | Best saved Transformer weights |
-| `FIG1_Phishing_Performance.png` | Original versus transformed phishing F1 and recall |
-| `FIG2_Robustness_ASR_CI.png` | F1 decrease with 95% CI and ASR |
-| `FIG3_Transformation_Diagnostics.png` | Transformation coverage and truncation analysis |
-| `FIG4_Phishing_PR_Curves.png` | Precision–recall curves |
-| `TABLE4_Robustness_Diagnostics.csv` | Detailed robustness statistics |
-| `Character_Level_Phishing_URL_Robustness_IEEE.tex` | IEEE-style manuscript source |
-
-If the filenames in your repository differ, update this table or rename the
-files so that the manuscript and image links remain valid. For cleaner GitHub
-links, consider renaming the notebook to `phishing_url_robustness.ipynb`.
-
-## Running the Notebook
-
-1. Open the notebook in Kaggle or a compatible Jupyter environment.
-2. Attach the Kaggle dataset listed above.
-3. Enable a GPU accelerator if available.
-4. Run the notebook from top to bottom to reproduce preprocessing, training,
-   evaluation, and exported figures.
-5. Generated images and CSV tables are written to the notebook's working
-   directory. On Kaggle, this is normally `/kaggle/working`.
-
-Typical Python dependencies include:
+## Repository layout
 
 ```text
-numpy
-pandas
-tensorflow
-scikit-learn
-scipy
-statsmodels
-matplotlib
-seaborn
+.
+├── README.md
+├── LICENSE
+├── notebooks/
+│   └── phishing_url_robustness.ipynb
+├── paper/
+│   ├── manuscript.tex
+│   └── figures/
+│       ├── FIG01_Split_Diagnostics.png
+│       ├── FIG05_Robustness_Heatmap_ASR.png
+│       └── FIG06_Cluster_Bootstrap_F1_Drop.png
+├── results/
+│   ├── CONFIG.json
+│   ├── REVIEWER_CHECKLIST.json
+│   ├── FILE_MANIFEST_SHA256.csv
+│   ├── character_vocabulary.json
+│   ├── requirements_frozen.txt
+│   └── tables/
+│       ├── CLEANING_AUDIT.csv
+│       ├── SPLIT_SUMMARY.csv
+│       ├── TRANSFORMATION_AUDIT.csv
+│       ├── METRICS_ALL_SEEDS.csv
+│       ├── METRIC_SUMMARY_MEAN_STD.csv
+│       ├── ROBUSTNESS_ALL_SEEDS.csv
+│       ├── ROBUSTNESS_SUMMARY_MEAN_STD.csv
+│       ├── PAIRED_STATISTICAL_TESTS_PRIMARY_SEED.csv
+│       ├── PAIRWISE_MODEL_TESTS_PRIMARY_SEED.csv
+│       ├── SUBGROUP_DIAGNOSTICS_PRIMARY_SEED.csv
+│       ├── MODEL_RUNS.csv
+│       ├── RUN_COMPLETENESS.csv
+│       └── TRAINING_HISTORY.csv
+└── CITATION.cff
 ```
 
-## Compiling the Paper
+`LICENSE` and `CITATION.cff` should be added after selecting the intended
+license and confirming the final publication metadata. Do not add placeholder
+DOIs.
 
-Place the manuscript and the four PNG figures in the same directory, then
-compile the LaTeX source with an IEEE-compatible LaTeX installation:
+## Reproducing the experiment
 
-```bash
-latexmk -pdf Character_Level_Phishing_URL_Robustness_IEEE.tex
-```
+### Recommended: Kaggle
 
-Before submission, replace the placeholder author, affiliation, and email
-fields in the manuscript.
+1. Create a Kaggle notebook and attach the
+   [dataset](https://www.kaggle.com/datasets/harisudhan411/phishing-and-legitimate-urls).
+2. Import `notebooks/phishing_url_robustness.ipynb`.
+3. Enable a GPU accelerator. The completed reference run used two Tesla T4
+   GPUs; a single supported GPU also works but takes longer.
+4. Select **Restart & Run All**. Do not execute training cells out of order.
+5. Confirm that `REVIEWER_CHECKLIST.json` contains only `true` or zero-valued
+   overlap checks.
+6. Download `/kaggle/working/phishing_robustness_v3_complete.zip` immediately,
+   or use **Save Version** with output files enabled.
+
+The final reference bundle is approximately 282.4 MB. Kaggle's
+`/kaggle/working` directory is not durable across all new sessions. Crash-safe
+`DONE.json` markers can resume completed model/seed runs only while their run
+directories still exist.
+
+### Local execution
+
+The completed reference run used:
+
+- Python 3.12.13
+- NumPy 2.0.2
+- pandas 2.3.3
+- SciPy 1.16.3
+- scikit-learn 1.6.1
+- TensorFlow 2.20.0
+
+For a local run, place the Kaggle dataset as `new_data_urls.csv` in the working
+directory or edit `DATASET_CANDIDATES` in configuration cell 1. Use a
+TensorFlow-compatible GPU environment for the deep models. The exact executed
+environment is recorded in `results/requirements_frozen.txt`.
+
+## Generated artifacts
+
+The complete ZIP includes:
+
+- 15 publication figures;
+- exact summary and long-form CSV tables;
+- 18 paired prediction files;
+- neural checkpoints and fitted classical estimators;
+- one `DONE.json` completion marker and run record per model/seed;
+- the training-only character vocabulary;
+- the compressed split manifest;
+- configuration and frozen dependency metadata; and
+- SHA-256 checksums.
+
+The full ZIP is intentionally distributed as a **GitHub Release asset** (or an
+archival repository artifact), not committed to the Git history.
 
 ## Limitations
 
-- The split is row-wise rather than grouped by registered domain or collection
-  time, so related URLs may occur across partitions.
-- Results are reported for one dataset and one training seed.
-- The transformation changes only 12.29% of test strings and is not a general
-  model of all URL-obfuscation attacks.
-- Percent-encoding can increase URL length; 251 additional URLs exceed the
-  200-character input limit after transformation.
-- The Transformer run experienced numerical instability after the best finite
-  checkpoint had already been saved.
+- Evaluation uses one public dataset with unknown collection dates and source
+  mixture; domain-held-out evaluation is not temporal or cross-source testing.
+- Registrable-domain grouping does not identify shared infrastructure or
+  campaign ownership across different domains.
+- Destination equivalence and browser/server behavior were not verified.
+- Percent-encoding newly pushes 2,454 test inputs beyond the 200-character
+  model limit, so truncation is a documented co-mechanism.
+- The IDNA condition changes only four URLs and does not support a
+  population-level conclusion.
+- Hyperparameters were fixed rather than selected by nested group
+  cross-validation.
 
-## Responsible Use
+## Citation
 
-This project is intended for defensive cybersecurity research and reproducible
-evaluation of phishing detectors. It should not be used to deploy malicious
-URLs or evade operational security systems.
+If this repository supports your work, cite the accompanying paper and this
+repository. Update the entry with the final venue, DOI, and publication year
+after acceptance.
+
+```bibtex
+@misc{halboup_phishing_url_robustness_2026,
+  author       = {Esra Halboup},
+  title        = {Leakage-Safe Phishing URL Detection Under Standards-Aware
+                  Transformations: A Domain-Held-Out, Multi-Seed Robustness Study},
+  year         = {2026},
+  howpublished = {GitHub repository},
+  url          = {https://github.com/esraaH2/-Phishing-URL-Detection-Under-Selective-Percent-Encoding}
+}
+```
+
+## License
+
+No license is implied by publication on GitHub. Add an explicit license before
+allowing reuse, and ensure that it is compatible with the dataset terms and
+the intended release of trained models and predictions.
