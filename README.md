@@ -202,22 +202,6 @@ directory or edit `DATASET_CANDIDATES` in configuration cell 1. Use a
 TensorFlow-compatible GPU environment for the deep models. The exact executed
 environment is recorded in `results/requirements_frozen.txt`.
 
-## Generated artifacts
-
-The complete ZIP includes:
-
-- 15 publication figures;
-- exact summary and long-form CSV tables;
-- 18 paired prediction files;
-- neural checkpoints and fitted classical estimators;
-- one `DONE.json` completion marker and run record per model/seed;
-- the training-only character vocabulary;
-- the compressed split manifest;
-- configuration and frozen dependency metadata; and
-- SHA-256 checksums.
-
-The full ZIP is intentionally distributed as a **GitHub Release asset** (or an
-archival repository artifact), not committed to the Git history.
 
 ## Limitations
 
@@ -233,25 +217,4 @@ archival repository artifact), not committed to the Git history.
 - Hyperparameters were fixed rather than selected by nested group
   cross-validation.
 
-## Citation
 
-If this repository supports your work, cite the accompanying paper and this
-repository. Update the entry with the final venue, DOI, and publication year
-after acceptance.
-
-```bibtex
-@misc{halboup_phishing_url_robustness_2026,
-  author       = {Esra Halboup},
-  title        = {Leakage-Safe Phishing URL Detection Under Standards-Aware
-                  Transformations: A Domain-Held-Out, Multi-Seed Robustness Study},
-  year         = {2026},
-  howpublished = {GitHub repository},
-  url          = {https://github.com/esraaH2/-Phishing-URL-Detection-Under-Selective-Percent-Encoding}
-}
-```
-
-## License
-
-No license is implied by publication on GitHub. Add an explicit license before
-allowing reuse, and ensure that it is compatible with the dataset terms and
-the intended release of trained models and predictions.
