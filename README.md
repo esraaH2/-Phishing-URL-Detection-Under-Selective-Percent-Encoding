@@ -153,36 +153,13 @@ variability and are not treated as independent datasets.
 ```text
 .
 ├── README.md
-├── LICENSE
 ├── notebooks/
 │   └── phishing_url_robustness.ipynb
-├── paper/
-│   ├── manuscript.tex
-│   └── figures/
-│       ├── FIG01_Split_Diagnostics.png
-│       ├── FIG05_Robustness_Heatmap_ASR.png
-│       └── FIG06_Cluster_Bootstrap_F1_Drop.png
-├── results/
-│   ├── CONFIG.json
-│   ├── REVIEWER_CHECKLIST.json
-│   ├── FILE_MANIFEST_SHA256.csv
-│   ├── character_vocabulary.json
-│   ├── requirements_frozen.txt
-│   └── tables/
-│       ├── CLEANING_AUDIT.csv
-│       ├── SPLIT_SUMMARY.csv
-│       ├── TRANSFORMATION_AUDIT.csv
-│       ├── METRICS_ALL_SEEDS.csv
-│       ├── METRIC_SUMMARY_MEAN_STD.csv
-│       ├── ROBUSTNESS_ALL_SEEDS.csv
-│       ├── ROBUSTNESS_SUMMARY_MEAN_STD.csv
-│       ├── PAIRED_STATISTICAL_TESTS_PRIMARY_SEED.csv
-│       ├── PAIRWISE_MODEL_TESTS_PRIMARY_SEED.csv
-│       ├── SUBGROUP_DIAGNOSTICS_PRIMARY_SEED.csv
-│       ├── MODEL_RUNS.csv
-│       ├── RUN_COMPLETENESS.csv
-│       └── TRAINING_HISTORY.csv
-└── CITATION.cff
+├   figures/
+│   ├── FIG01_Split_Diagnostics.png
+│   ├── FIG05_Robustness_Heatmap_ASR.png
+│   └── FIG06_Cluster_Bootstrap_F1_Drop.png
+
 ```
 
 `LICENSE` and `CITATION.cff` should be added after selecting the intended
